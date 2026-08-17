@@ -1,3 +1,5 @@
 .DS_Store
 __pycache__/
 *.pyc
+assessment_history.csv
+GiveMeSomeCredit/assessment_history.csv

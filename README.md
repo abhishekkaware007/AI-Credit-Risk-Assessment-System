@@ -5,43 +5,40 @@
 [![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-v1.3+-F7931E?logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
 [![XGBoost](https://img.shields.io/badge/XGBoost-v2.0+-eb5424)](https://xgboost.readthedocs.io/)
 [![SHAP](https://img.shields.io/badge/SHAP-Explainable%20AI-success)](https://shap.readthedocs.io/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **Enterprise-grade Machine Learning system for automated Probability of Default (PD) scoring, Explainable AI (XAI) risk attribution, and portfolio underwriting analytics.**
-
----
-
-## 📌 Executive Summary & Business Impact
-
-Credit risk assessment is a foundational pillar of banking and fintech operations. Inaccurate default prediction directly inflates Non-Performing Assets (NPAs), while opaque "black-box" models violate regulatory compliance frameworks (**Basel II/III, FCRA, ECOA**).
-
-**CreditIQ** bridges the gap between high-accuracy predictive modeling and regulatory explainability:
-- **Reduces Credit Underwriting Latency** by providing instant Probability of Default (PD) scoring.
-- **Ensures Model Transparency** via individual-level **SHAP (SHapley Additive exPlanations)** waterfall attributions, pinpointing the exact factors driving credit approval or rejection.
-- **Empowers Applicants** through an automated **What-If Sensitivity Engine** that identifies actionable steps to improve creditworthiness.
-- **Scales Enterprise Operations** with high-throughput batch CSV scoring and portfolio risk distribution analytics.
+CreditIQ is an end-to-end Machine Learning web platform designed to evaluate loan applicant default risk in real time, generate interpretable risk factor attributions via Explainable AI (XAI), simulate counterfactual credit improvement pathways, and process bulk underwriting portfolios.
 
 ---
 
-## 🚀 Live Demo & Quick Launch
+## 📌 Project Overview
 
-- **Live Streamlit Cloud Demo**: [Launch CreditIQ on Streamlit Cloud](https://share.streamlit.io/)
-- **Repository**: [github.com/abhishekkaware007/AI-Credit-Risk-Assessment-System](https://github.com/abhishekkaware007/AI-Credit-Risk-Assessment-System)
+Credit risk modeling is essential for financial institutions to assess borrower solvency, mitigate default losses, and maintain underwriting consistency. CreditIQ provides an automated underwriting intelligence dashboard powered by ensemble learning and model explainability frameworks:
+
+- **Automated Default Probability Scoring**: Calculates applicant Probability of Default (PD) and assigns structured risk tiers (*Minimal, Low, Moderate, High, Critical*).
+- **Explainable AI (XAI)**: Leverages SHAP (SHapley Additive exPlanations) waterfall plots to provide granular transparency into why a specific risk score was produced.
+- **Counterfactual What-If Engine**: Identifies specific financial adjustments (such as reducing revolving utilization or clearing overdue accounts) to lower default probability.
+- **Batch Underwriting**: Supports bulk CSV applicant scoring, aggregate risk metrics, and downloadable portfolio reports.
+- **Audit Trail Logging**: Stores assessment history with timestamps and financial snapshots for compliance tracking.
 
 ---
 
-## 📊 Model Performance & Benchmarking
+## 🚀 Live Demo & Repository
 
-Four candidate architectures were trained and evaluated on 150,000+ historical lending records from the *Give Me Some Credit* dataset, with **SMOTE (Synthetic Minority Over-sampling Technique)** applied to address severe class imbalance (~6.7% baseline default rate):
+- **Live Application**: [Launch CreditIQ on Streamlit Cloud](https://share.streamlit.io/)
+- **GitHub Repository**: [abhishekkaware007/AI-Credit-Risk-Assessment-System](https://github.com/abhishekkaware007/AI-Credit-Risk-Assessment-System)
+
+---
+
+## 📊 Model Evaluation & Benchmarks
+
+Four machine learning architectures were trained on 150,000+ historical lending records from the *Give Me Some Credit* dataset. Class imbalance (~6.7% default rate) was handled using **SMOTE (Synthetic Minority Over-sampling Technique)**:
 
 | Model Architecture | AUC-ROC | Accuracy | Precision | Recall | F1-Score | Status |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Random Forest (Regularized)** | **0.8438** | **94.59%** | **0.5829** | **0.6577** | **0.6181** | 🏆 **Production Primary** |
+| **Random Forest (Regularized)** | **0.8438** | **94.59%** | **0.5829** | **0.6577** | **0.6181** | 🏆 **Production Model** |
 | **Gradient Boosting Classifier** | 0.8421 | 78.89% | 0.2037 | 0.7459 | 0.3200 | Candidate |
 | **XGBoost Classifier** | 0.8280 | 82.42% | 0.2189 | 0.6389 | 0.3261 | Candidate |
-| **Logistic Regression (Baseline)** | 0.7988 | 78.41% | 0.1867 | 0.6684 | 0.2919 | Baseline |
-
-> **Key Takeaway**: The regularized Random Forest model delivers superior discrimination (**0.8438 AUC-ROC**) with optimal precision-recall balance for real-world risk management.
+| **Logistic Regression** | 0.7988 | 78.41% | 0.1867 | 0.6684 | 0.2919 | Baseline |
 
 ---
 
@@ -56,65 +53,78 @@ Four candidate architectures were trained and evaluated on 150,000+ historical l
                                                                            │
                                                                            ▼
 ┌────────────────────────┐     ┌────────────────────────┐     ┌────────────────────────┐
-│ Streamlit Cloud UI     │ <── │ Explainable AI Engine  │ <── │ Trained Ensembles      │
+│ Streamlit UI           │ <── │ Explainable AI Engine  │ <── │ Trained Ensembles      │
 │ • Real-time Scoring    │     │ • SHAP TreeExplainer   │     │ • Random Forest        │
 │ • What-If Simulator    │     │ • Waterfall Plots      │     │ • XGBoost / GBDT       │
-│ • Batch CSV Underwrite │     │ • Feature Importance   │     │ • StandardScaler       │
+│ • Batch Underwriting   │     │ • Feature Importance   │     │ • StandardScaler       │
 └────────────────────────┘     └────────────────────────┘     └────────────────────────┘
 ```
 
 ---
 
-## ✨ Key Platform Features
+## ✨ Key Features
 
-### 1. 🎯 Real-Time Underwriting & Probability of Default
-- Interactive multi-factor input sidebar covering demographics, income, revolving credit utilization, open loans, real estate lines, and delinquency history (30-59, 60-89, 90+ days past due).
-- Instant multi-tier risk classification:
-  - 🟢 **MINIMAL Risk** (0–20% Default Prob) → *Full Auto-Approval*
-  - 🟡 **LOW Risk** (20–40% Default Prob) → *Standard Approval*
-  - 🟠 **MODERATE Risk** (40–60% Default Prob) → *Manual Review Required*
-  - 🔴 **HIGH Risk** (60–80% Default Prob) → *Advisory Rejection*
-  - 🚨 **CRITICAL Risk** (80–100% Default Prob) → *Immediate Denial*
+### 1. Real-Time Applicant Underwriting
+- Multi-parameter inputs: Age, Monthly Income, Debt Ratio, Credit Card Utilization, Open Loans, Real Estate Loans, and Delinquency History (30-59, 60-89, 90+ days past due).
+- Automated categorization:
+  - 🟢 **MINIMAL Risk** (0–20% Default Prob) → Recommend Full Approval
+  - 🟡 **LOW Risk** (20–40% Default Prob) → Standard Approval & Review
+  - 🟠 **MODERATE Risk** (40–60% Default Prob) → Enhanced Review / Collateral Required
+  - 🔴 **HIGH Risk** (60–80% Default Prob) → Reject Under Standard Terms
+  - 🚨 **CRITICAL Risk** (80–100% Default Prob) → Immediate Denial
 
-### 2. 🔍 Explainable AI (XAI) via SHAP Waterfall
-- Transparent, per-applicant feature attribution showing which variables drove the score up or down.
-- Meets adverse action explanation requirements under lending regulations.
+### 2. SHAP Feature Attribution (Explainable AI)
+- Generates individual waterfall attribution charts demonstrating the exact directional contribution of each feature to the final prediction.
 
-### 3. 🧪 Interactive What-If Scenario Engine
-- Simulates counterfactual adjustments (e.g. paying down credit card utilization to 20% or clearing late payments).
-- Ranks recommendations by predicted percentage-point risk reduction.
+### 3. What-If Scenario Simulator
+- Evaluates hypothetical improvements to the applicant's financial profile and ranks recommendations by predicted risk reduction percentage points.
 
-### 4. 📁 Batch Portfolio Underwriting & Analytics
-- Upload bulk applicant CSV datasets for instant enterprise-scale assessment.
-- Interactive Plotly portfolio risk distribution visualization and one-click annotated CSV export.
+### 4. Batch Processing & Portfolio Distribution
+- Accepts CSV uploads of applicant datasets for instant scoring.
+- Displays risk distribution charts across portfolio tiers with downloadable result exports.
 
-### 5. 💾 Compliance Audit Trail & Historical Decision Log
-- Persistent logging of credit assessments with timestamps, metrics, and underwriting decisions.
-- Exportable audit trail for risk reporting and quality assurance.
+### 5. Audit Logging & Export
+- Logs applicant assessments with timestamps, inputs, and risk decisions.
+- Supports historical viewing and one-click CSV export.
 
 ---
 
-## 🛠️ Tech Stack & ATS Keywords
+## 📁 Repository Structure
 
-- **Core Language**: Python 3.10+
-- **Machine Learning**: Scikit-Learn, XGBoost, Ensemble Learning, Random Forest, Gradient Boosting, Logistic Regression, SMOTE (`imbalanced-learn`)
-- **Model Explainability & XAI**: SHAP (SHapley Additive exPlanations), TreeExplainer, Waterfall Attribution Plots
-- **Data Engineering & Analysis**: Pandas, NumPy, Feature Engineering, Outlier Treatment, Missing Value Imputation
-- **Data Visualization**: Plotly Graph Objects, Matplotlib, Seaborn
-- **Application & Cloud Deployment**: Streamlit, Streamlit Cloud, Git LFS Optimization
+```text
+AI-Credit-Risk-Assessment-System/
+├── GiveMeSomeCredit/
+│   ├── 01_EDA.ipynb               # Exploratory data analysis
+│   ├── 02_preprocessing.ipynb      # Data cleaning & feature engineering
+│   ├── 03_model_training.ipynb     # Model training with SMOTE
+│   ├── 04_evaluation.ipynb         # Evaluation & ROC-AUC comparison
+│   ├── cs-training.csv            # Training dataset
+│   ├── cs-test.csv                # Test dataset
+│   ├── app.py                     # Streamlit application
+│   └── requirements.txt           # Subdirectory dependencies
+├── models/
+│   ├── random_forest.pkl          # Primary production model
+│   ├── xgboost.pkl                # XGBoost model artifact
+│   ├── gradient_boosting.pkl      # Gradient boosting model artifact
+│   ├── logistic_regression.pkl    # Logistic regression baseline
+│   ├── scaler.pkl                 # Feature standard scaler
+│   └── evaluation_results.csv     # Model metric comparison summary
+├── streamlit_app.py               # Root deployment entrypoint
+├── app.py                         # Root execution alias
+├── requirements.txt               # Production dependencies
+└── README.md                      # Project documentation
+```
 
 ---
 
-## 💼 ATS-Optimized Resume Bullet Points
+## 🛠️ Tech Stack
 
-> *Feel free to copy-paste these high-impact bullet points into your resume:*
-
-- **AI Credit Risk Assessment & Underwriting System (CreditIQ) | Machine Learning & Streamlit**
-  - Engineered an end-to-end credit risk assessment system on 150,000+ historical lending records, developing an ensemble Random Forest model achieving **0.844 AUC-ROC** and **94.6% accuracy**.
-  - Implemented **SMOTE** to resolve severe class imbalance (6.7% default rate) and engineered custom solvency features (*IncomePerDependent*, *TotalLatePayments*) improving predictive recall to 65.8%.
-  - Integrated **Explainable AI (XAI)** using **SHAP TreeExplainer** to generate waterfall attribution plots, ensuring model transparency and compliance with lending regulations (FCRA/ECOA).
-  - Built an interactive **Streamlit** dashboard featuring real-time risk classification, a counterfactual **What-If simulation engine**, batch portfolio CSV underwriting, and audit logging.
-  - Optimized model serialization and memory footprint from 419MB to **6.5MB**, enabling sub-second inference and zero-latency deployment on Streamlit Cloud.
+- **Programming Language**: Python 3.10+
+- **Machine Learning**: Scikit-Learn, XGBoost, Imbalanced-Learn (SMOTE)
+- **Model Explainability**: SHAP (TreeExplainer)
+- **Data Manipulation**: Pandas, NumPy
+- **Visualizations**: Plotly, Matplotlib, Seaborn
+- **Application Framework**: Streamlit
 
 ---
 
@@ -137,35 +147,28 @@ Four candidate architectures were trained and evaluated on 150,000+ historical l
    pip install -r requirements.txt
    ```
 
-4. **Launch the Streamlit app**:
+4. **Launch the application**:
    ```bash
    streamlit run streamlit_app.py
    ```
-   *The application will open automatically at `http://localhost:8501`.*
+   *The app will be accessible locally at `http://localhost:8501`.*
 
 ---
 
-## ☁️ Deploying to Streamlit Cloud (Step-by-Step)
+## ☁️ Deployment on Streamlit Community Cloud
 
-1. Fork or push this repository to your GitHub account: `https://github.com/abhishekkaware007/AI-Credit-Risk-Assessment-System`
-2. Go to **[share.streamlit.io](https://share.streamlit.io)** and log in with your GitHub account.
-3. Click **"New app"** (or **"Create app"**).
-4. Configure the deployment settings:
+1. Push or fork this repository to your GitHub account.
+2. Sign in to **[share.streamlit.io](https://share.streamlit.io)** using your GitHub credentials.
+3. Click **"New app"** and enter the following configuration:
    - **Repository**: `abhishekkaware007/AI-Credit-Risk-Assessment-System`
    - **Branch**: `main`
-   - **Main file path**: `streamlit_app.py` (or `app.py`)
-5. Click **"Deploy!"** — Streamlit will automatically install `requirements.txt` and launch your live web application in seconds.
+   - **Main file path**: `streamlit_app.py`
+4. Click **"Deploy!"**.
 
 ---
 
-## 👤 Author & Contact
+## 👤 Author
 
 **Abhishek Kaware**
 - **GitHub**: [@abhishekkaware007](https://github.com/abhishekkaware007)
-- **Project Repository**: [AI-Credit-Risk-Assessment-System](https://github.com/abhishekkaware007/AI-Credit-Risk-Assessment-System)
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- **Repository**: [AI-Credit-Risk-Assessment-System](https://github.com/abhishekkaware007/AI-Credit-Risk-Assessment-System)
