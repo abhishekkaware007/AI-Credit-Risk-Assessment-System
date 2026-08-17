@@ -24,7 +24,7 @@ Credit risk modeling is essential for financial institutions to assess borrower 
 
 ## 🚀 Live Demo & Repository
 
-- **Live Application**: [Launch CreditIQ on Streamlit Cloud](https://share.streamlit.io/)
+- **Live Application**: [Launch CreditIQ on Streamlit Cloud](https://creditiq-risk.streamlit.app/)
 - **GitHub Repository**: [abhishekkaware007/AI-Credit-Risk-Assessment-System](https://github.com/abhishekkaware007/AI-Credit-Risk-Assessment-System)
 
 ---
