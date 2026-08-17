@@ -5,6 +5,7 @@ import joblib
 import os
 import shap
 import datetime
+import tempfile
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -14,14 +15,14 @@ import plotly.graph_objects as go
 # PAGE CONFIG
 # ─────────────────────────────────────────────
 st.set_page_config(
-    page_title="CreditIQ — Loan Risk Dashboard",
+    page_title="CreditIQ — AI Loan Risk Assessment",
     page_icon="💎",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # ─────────────────────────────────────────────
-# CSS
+# CSS STYLING
 # ─────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -45,7 +46,8 @@ html, body, [class*="css"] {
 }
 [data-testid="stSidebar"] * { color: #cbd5e1 !important; }
 [data-testid="stSidebar"] .stSlider label,
-[data-testid="stSidebar"] .stNumberInput label {
+[data-testid="stSidebar"] .stNumberInput label,
+[data-testid="stSidebar"] .stSelectbox label {
     color: #475569 !important;
     font-size: 0.75rem !important;
     font-weight: 600 !important;
@@ -180,7 +182,7 @@ html, body, [class*="css"] {
     border-radius: 999px;
 }
 .brand     { font-size:1.3rem; font-weight:700; color:#3b82f6 !important; letter-spacing:-0.02em; }
-.brand-tag { font-size:0.68rem; color:#334155 !important; text-transform:uppercase; letter-spacing:0.1em; }
+.brand-tag { font-size:0.68rem; color:#64748b !important; text-transform:uppercase; letter-spacing:0.1em; }
 
 /* ── Indicator row for key financials ── */
 .indicator-row {
@@ -206,18 +208,54 @@ html, body, [class*="css"] {
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# LOAD MODEL
+# LOAD MODEL & SCALER (DYNAMIC MULTI-PATH & FALLBACK)
 # ─────────────────────────────────────────────
 @st.cache_resource
 def load_model():
-    try:
-        base   = os.path.dirname(os.path.abspath(__file__))
-        mpath  = os.path.join(base, '..', 'models')
-        model  = joblib.load(os.path.join(mpath, 'random_forest.pkl'))
-        scaler = joblib.load(os.path.join(mpath, 'scaler.pkl'))
-        return model, scaler, mpath, None
-    except Exception as e:
-        return None, None, None, str(e)
+    curr_dir = os.path.dirname(os.path.abspath(__file__))
+    candidate_dirs = [
+        os.path.join(curr_dir, 'models'),
+        os.path.join(curr_dir, '..', 'models'),
+        os.path.join(os.getcwd(), 'models'),
+        os.path.join(os.getcwd(), 'GiveMeSomeCredit', 'models')
+    ]
+    
+    mpath = None
+    for d in candidate_dirs:
+        if os.path.isdir(d):
+            mpath = d
+            break
+            
+    if not mpath:
+        return None, None, None, "Models directory not found."
+    
+    # Try loading primary Random Forest model, with fallback to XGBoost / Gradient Boosting
+    model_candidates = ['random_forest.pkl', 'xgboost.pkl', 'gradient_boosting.pkl', 'logistic_regression.pkl']
+    model = None
+    loaded_name = None
+    
+    for mname in model_candidates:
+        p = os.path.join(mpath, mname)
+        if os.path.exists(p):
+            try:
+                model = joblib.load(p)
+                loaded_name = mname
+                break
+            except Exception:
+                continue
+                
+    if model is None:
+        return None, None, None, f"Could not load any model artifact from {mpath}."
+        
+    scaler = None
+    scaler_path = os.path.join(mpath, 'scaler.pkl')
+    if os.path.exists(scaler_path):
+        try:
+            scaler = joblib.load(scaler_path)
+        except Exception:
+            scaler = None
+
+    return model, scaler, mpath, None
 
 model, scaler, mpath, err = load_model()
 if err:
@@ -227,10 +265,18 @@ if err:
 # ─────────────────────────────────────────────
 # HISTORY FILE PATH
 # ─────────────────────────────────────────────
-HISTORY_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    'assessment_history.csv'
-)
+def get_history_path():
+    curr_dir = os.path.dirname(os.path.abspath(__file__))
+    primary = os.path.join(curr_dir, 'assessment_history.csv')
+    try:
+        # test write access
+        with open(primary, 'a') as f:
+            pass
+        return primary
+    except Exception:
+        return os.path.join(tempfile.gettempdir(), 'assessment_history.csv')
+
+HISTORY_PATH = get_history_path()
 
 # ─────────────────────────────────────────────
 # 5 RISK CATEGORIES
@@ -297,7 +343,7 @@ def get_risk(prob_pct):
 # ─────────────────────────────────────────────
 with st.sidebar:
     st.markdown('<div class="brand">💎 CreditIQ</div>', unsafe_allow_html=True)
-    st.markdown('<div class="brand-tag">Loan Risk Intelligence</div>', unsafe_allow_html=True)
+    st.markdown('<div class="brand-tag">AI Loan Risk Intelligence</div>', unsafe_allow_html=True)
     st.markdown("---")
 
     st.markdown('<div class="section-label">Personal Information</div>', unsafe_allow_html=True)
@@ -324,8 +370,8 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown(
-        '<div style="font-size:0.68rem;color:#1e293b;text-align:center">'
-        'Abhishek Kaware · VIT Pune · 2025'
+        '<div style="font-size:0.72rem;color:#64748b;text-align:center">'
+        'Abhishek Kaware · CreditIQ Engine'
         '</div>',
         unsafe_allow_html=True
     )
@@ -334,6 +380,21 @@ with st.sidebar:
 # COMPUTE PREDICTION
 # ─────────────────────────────────────────────
 total_late = late_30_59 + late_60_89 + late_90
+
+MODEL_FEATURES = [
+    'RevolvingUtilizationOfUnsecuredLines',
+    'age',
+    'NumberOfTime30-59DaysPastDueNotWorse',
+    'DebtRatio',
+    'MonthlyIncome',
+    'NumberOfOpenCreditLinesAndLoans',
+    'NumberOfTimes90DaysLate',
+    'NumberRealEstateLoansOrLines',
+    'NumberOfTime60-89DaysPastDueNotWorse',
+    'NumberOfDependents',
+    'TotalLatePayments',
+    'IncomePerDependent'
+]
 
 input_df = pd.DataFrame([{
     'RevolvingUtilizationOfUnsecuredLines': revolving_util,
@@ -348,9 +409,9 @@ input_df = pd.DataFrame([{
     'NumberOfDependents':                    dependents,
     'TotalLatePayments':                     total_late,
     'IncomePerDependent':                    income / (dependents + 1),
-}])
+}])[MODEL_FEATURES]
 
-X_input      = input_df.values
+X_input      = input_df[MODEL_FEATURES]
 prob         = model.predict_proba(X_input)[0][1]
 prob_pct     = round(prob * 100, 1)
 risk         = get_risk(prob_pct)
@@ -367,7 +428,7 @@ with h1:
         'Loan Application Risk Assessment'
         '</div>'
         '<div style="font-size:0.82rem;color:#94a3b8;margin-top:0.2rem">'
-        'AI-driven credit risk analysis · Adjust applicant details in the sidebar'
+        'AI-driven credit risk analysis & automated underwriting intelligence'
         '</div>',
         unsafe_allow_html=True
     )
@@ -457,8 +518,6 @@ col_g, col_f, col_r = st.columns([1.1, 1, 1])
 
 with col_g:
     st.markdown('<div class="panel"><div class="panel-title">Default Probability Meter</div>', unsafe_allow_html=True)
-
-    r, g, b = int(risk['color'][1:3],16), int(risk['color'][3:5],16), int(risk['color'][5:7],16)
 
     fig_gauge = go.Figure(go.Indicator(
         mode="gauge+number",
@@ -585,19 +644,17 @@ with col_r:
 st.markdown("")
 
 # ─────────────────────────────────────────────
-# SECTION 5 — SHAP + KEY INDICATORS (FIXED)
+# SECTION 5 — SHAP + KEY INDICATORS
 # ─────────────────────────────────────────────
-st.markdown('<div class="section-label">Why This Prediction Was Made</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-label">Why This Prediction Was Made (Explainable AI)</div>', unsafe_allow_html=True)
 
 col_shap, col_stats = st.columns([1.6, 1])
 
 with col_shap:
-
-    # ── Visible title ──────────────────────────
     st.markdown("""
     <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;
                 letter-spacing:0.1em;color:#e2e8f0;margin-bottom:0.4rem">
-        Feature Impact
+        SHAP Feature Impact Attribution
     </div>
     <div style="font-size:0.78rem;color:#64748b;margin-bottom:1rem">
         Which features pushed the risk
@@ -609,27 +666,44 @@ with col_shap:
     """, unsafe_allow_html=True)
 
     try:
-        with st.spinner("Computing impact..."):
-            explainer  = shap.TreeExplainer(model)
-            shap_vals  = explainer.shap_values(input_df)
+        with st.spinner("Computing SHAP feature attribution..."):
+            explainer = shap.TreeExplainer(model)
+            shap_vals = explainer.shap_values(input_df)
 
-            # Larger figure so all features are visible
+            # Robust shape handling across models and shap versions
+            if isinstance(shap_vals, list):
+                s_vals = shap_vals[1][0] if len(shap_vals) > 1 else shap_vals[0][0]
+                b_val = explainer.expected_value[1] if isinstance(explainer.expected_value, (list, np.ndarray)) and len(explainer.expected_value) > 1 else (explainer.expected_value[0] if isinstance(explainer.expected_value, (list, np.ndarray)) else explainer.expected_value)
+            elif isinstance(shap_vals, np.ndarray) and shap_vals.ndim == 3 and shap_vals.shape[2] == 2:
+                s_vals = shap_vals[0, :, 1]
+                if hasattr(explainer, 'expected_value') and isinstance(explainer.expected_value, (list, np.ndarray)) and len(explainer.expected_value) > 1:
+                    b_val = explainer.expected_value[1]
+                elif hasattr(explainer, 'expected_value'):
+                    b_val = explainer.expected_value
+                else:
+                    b_val = 0.5
+            elif isinstance(shap_vals, np.ndarray) and shap_vals.ndim == 2:
+                s_vals = shap_vals[0]
+                b_val = explainer.expected_value[0] if isinstance(explainer.expected_value, (list, np.ndarray)) else (explainer.expected_value if hasattr(explainer, 'expected_value') else 0.5)
+            else:
+                s_vals = np.array(shap_vals).flatten()[:len(input_df.columns)]
+                b_val = 0.5
+
             fig2, ax = plt.subplots(figsize=(9, 6))
             fig2.patch.set_facecolor('#0d1117')
             ax.set_facecolor('#0d1117')
 
             shap.waterfall_plot(
                 shap.Explanation(
-                    values=shap_vals[0][0],
-                    base_values=explainer.expected_value[0],
-                    data=input_df.iloc[0],
+                    values=s_vals,
+                    base_values=float(b_val) if np.isscalar(b_val) else float(b_val[0]),
+                    data=input_df.iloc[0].values,
                     feature_names=input_df.columns.tolist()
                 ),
                 show=False,
                 max_display=12
             )
 
-            # Style all text visible
             ax.tick_params(colors='#94a3b8', labelsize=10)
             for text in ax.texts:
                 text.set_color('#e2e8f0')
@@ -647,11 +721,9 @@ with col_shap:
             plt.close()
 
     except Exception as e:
-        st.info(f"Feature impact unavailable: {e}")
+        st.info(f"Feature impact visualizer: {e}")
 
 with col_stats:
-
-    # ── Visible title ──────────────────────────
     st.markdown("""
     <div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;
                 letter-spacing:0.1em;color:#e2e8f0;margin-bottom:1rem">
@@ -688,12 +760,12 @@ st.markdown("---")
 # ─────────────────────────────────────────────
 # SECTION 6 — WHAT-IF ANALYSIS
 # ─────────────────────────────────────────────
-st.markdown('<div class="section-label">What-If Analysis — How to Reduce Risk</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-label">What-If Analysis — Interactive Risk Reduction Engine</div>', unsafe_allow_html=True)
 
 if prob_pct >= 40:
     st.markdown(
         '<div style="font-size:0.82rem;color:#64748b;margin-bottom:1rem">'
-        'Showing what specific changes would reduce this applicant\'s default probability. Sorted by biggest impact first.'
+        'Showing what specific financial changes would reduce this applicant\'s default probability, prioritized by impact.'
         '</div>',
         unsafe_allow_html=True
     )
@@ -704,7 +776,7 @@ if prob_pct >= 40:
         test_df = input_df.copy()
         test_df['NumberOfTimes90DaysLate'] = 0
         test_df['TotalLatePayments']       = late_30_59 + late_60_89 + 0
-        new_prob = model.predict_proba(test_df.values)[0][1] * 100
+        new_prob = model.predict_proba(test_df[MODEL_FEATURES])[0][1] * 100
         drop     = prob_pct - new_prob
         new_risk = get_risk(new_prob)
         suggestions.append({
@@ -721,7 +793,7 @@ if prob_pct >= 40:
     if debt_ratio > 0.5:
         test_df = input_df.copy()
         test_df['DebtRatio'] = 0.30
-        new_prob = model.predict_proba(test_df.values)[0][1] * 100
+        new_prob = model.predict_proba(test_df[MODEL_FEATURES])[0][1] * 100
         drop     = prob_pct - new_prob
         new_risk = get_risk(new_prob)
         suggestions.append({
@@ -738,7 +810,7 @@ if prob_pct >= 40:
     if revolving_util > 0.5:
         test_df = input_df.copy()
         test_df['RevolvingUtilizationOfUnsecuredLines'] = 0.20
-        new_prob = model.predict_proba(test_df.values)[0][1] * 100
+        new_prob = model.predict_proba(test_df[MODEL_FEATURES])[0][1] * 100
         drop     = prob_pct - new_prob
         new_risk = get_risk(new_prob)
         suggestions.append({
@@ -757,7 +829,7 @@ if prob_pct >= 40:
         new_income = income * 1.5
         test_df['MonthlyIncome']      = new_income
         test_df['IncomePerDependent'] = new_income / (dependents + 1)
-        new_prob = model.predict_proba(test_df.values)[0][1] * 100
+        new_prob = model.predict_proba(test_df[MODEL_FEATURES])[0][1] * 100
         drop     = prob_pct - new_prob
         new_risk = get_risk(new_prob)
         suggestions.append({
@@ -775,7 +847,7 @@ if prob_pct >= 40:
         test_df = input_df.copy()
         test_df['NumberOfTime30-59DaysPastDueNotWorse'] = 0
         test_df['TotalLatePayments'] = 0 + late_60_89 + late_90
-        new_prob = model.predict_proba(test_df.values)[0][1] * 100
+        new_prob = model.predict_proba(test_df[MODEL_FEATURES])[0][1] * 100
         drop     = prob_pct - new_prob
         new_risk = get_risk(new_prob)
         suggestions.append({
@@ -827,10 +899,10 @@ else:
     <div style="background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.2);
                 border-radius:12px;padding:1.2rem 1.6rem">
         <div style="color:#4ade80;font-size:0.92rem;font-weight:600;margin-bottom:0.3rem">
-            ✓ Risk is already low at {prob_pct}%
+            ✓ Risk is already optimal at {prob_pct}%
         </div>
         <div style="color:#64748b;font-size:0.83rem">
-            No improvements needed. This applicant meets all standard lending criteria.
+            No improvements required. This applicant satisfies prime lending criteria.
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -840,7 +912,7 @@ st.markdown("---")
 # ─────────────────────────────────────────────
 # SECTION 7 — ASSESSMENT HISTORY
 # ─────────────────────────────────────────────
-st.markdown('<div class="section-label">Assessment History</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-label">Audit Trail & Assessment History</div>', unsafe_allow_html=True)
 
 def save_assessment():
     new_row = {
@@ -856,11 +928,11 @@ def save_assessment():
         'Decision':        risk['decision'],
     }
     if os.path.exists(HISTORY_PATH):
-        hist_df = pd.read_csv(HISTORY_PATH)
-        hist_df = pd.concat(
-            [hist_df, pd.DataFrame([new_row])],
-            ignore_index=True
-        )
+        try:
+            hist_df = pd.read_csv(HISTORY_PATH)
+            hist_df = pd.concat([hist_df, pd.DataFrame([new_row])], ignore_index=True)
+        except Exception:
+            hist_df = pd.DataFrame([new_row])
     else:
         hist_df = pd.DataFrame([new_row])
     hist_df.to_csv(HISTORY_PATH, index=False)
@@ -871,46 +943,54 @@ btn_col, toggle_col = st.columns([1, 2])
 with btn_col:
     if st.button("💾  Save This Assessment", use_container_width=True):
         count = save_assessment()
-        st.success(f"✅ Saved! Total assessments: {count}")
+        st.success(f"✅ Saved! Total logged assessments: {count}")
 
 with toggle_col:
     show_history = st.checkbox("📋  View All Past Assessments")
 
 if show_history:
     if os.path.exists(HISTORY_PATH):
-        hist_df = pd.read_csv(HISTORY_PATH)
+        try:
+            hist_df = pd.read_csv(HISTORY_PATH)
+            if len(hist_df) > 0:
+                s1, s2, s3, s4 = st.columns(4)
+                s1.metric("Total Assessed", len(hist_df))
+                s2.metric("Approved",       len(hist_df[hist_df['Decision'] == 'APPROVE']))
+                s3.metric("Rejected",       len(hist_df[hist_df['Decision'] == 'REJECT']))
+                s4.metric("Under Review",   len(hist_df[hist_df['Decision'] == 'REVIEW']))
 
-        s1, s2, s3, s4 = st.columns(4)
-        s1.metric("Total Assessed", len(hist_df))
-        s2.metric("Approved",       len(hist_df[hist_df['Decision'] == 'APPROVE']))
-        s3.metric("Rejected",       len(hist_df[hist_df['Decision'] == 'REJECT']))
-        s4.metric("Under Review",   len(hist_df[hist_df['Decision'] == 'REVIEW']))
+                st.markdown("")
+                st.dataframe(hist_df, hide_index=True, use_container_width=True)
+                st.markdown("")
 
-        st.markdown("")
-        st.dataframe(hist_df, hide_index=True, use_container_width=True)
-        st.markdown("")
-
-        dl_col, clear_col = st.columns([1, 1])
-        with dl_col:
-            st.download_button(
-                label="📥  Download History as CSV",
-                data=hist_df.to_csv(index=False),
-                file_name="assessment_history.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-        with clear_col:
-            if st.button("🗑  Clear All History", use_container_width=True):
-                os.remove(HISTORY_PATH)
-                st.warning("History cleared.")
-                st.rerun()
+                dl_col, clear_col = st.columns([1, 1])
+                with dl_col:
+                    st.download_button(
+                        label="📥  Download History as CSV",
+                        data=hist_df.to_csv(index=False),
+                        file_name="assessment_history.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+                with clear_col:
+                    if st.button("🗑  Clear All History", use_container_width=True):
+                        try:
+                            os.remove(HISTORY_PATH)
+                        except Exception:
+                            pass
+                        st.warning("History cleared.")
+                        st.rerun()
+            else:
+                st.info("Assessment history is empty.")
+        except Exception as e:
+            st.info(f"Could not read history log: {e}")
     else:
         st.markdown("""
         <div style="background:#0d1117;border:1px solid #161d27;border-radius:12px;
                     padding:1.2rem 1.6rem;color:#64748b;font-size:0.83rem">
             No assessments saved yet. Click
             <strong style="color:#94a3b8">Save This Assessment</strong>
-            above to start building history.
+            above to log underwriting decisions.
         </div>
         """, unsafe_allow_html=True)
 
@@ -919,18 +999,17 @@ st.markdown("---")
 # ─────────────────────────────────────────────
 # SECTION 8 — BATCH PREDICTION
 # ─────────────────────────────────────────────
-st.markdown('<div class="section-label">Batch Prediction — Assess Multiple Applicants at Once</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-label">Batch Underwriting & Portfolio Risk Assessment</div>', unsafe_allow_html=True)
 
 st.markdown(
     '<div style="font-size:0.82rem;color:#64748b;margin-bottom:1rem">'
-    'Upload a CSV file containing multiple applicants. '
-    'The system will predict default risk for all of them instantly '
-    'and generate a downloadable results report.'
+    'Upload a CSV file of applicants to evaluate enterprise credit risk at scale '
+    'with instant automated underwriting decisions and portfolio breakdown.'
     '</div>',
     unsafe_allow_html=True
 )
 
-with st.expander("📋  Required CSV columns — click to expand"):
+with st.expander("📋  Required CSV Schema & Sample Template"):
     st.markdown("Your CSV must contain these columns (names must match exactly):")
     st.code("""RevolvingUtilizationOfUnsecuredLines
 age
@@ -942,7 +1021,7 @@ NumberOfTimes90DaysLate
 NumberRealEstateLoansOrLines
 NumberOfTime60-89DaysPastDueNotWorse
 NumberOfDependents""")
-    st.caption("TotalLatePayments and IncomePerDependent will be calculated automatically.")
+    st.caption("Engine automatically calculates engineered features: TotalLatePayments & IncomePerDependent.")
 
     sample_data = pd.DataFrame([
         [0.10, 52, 0, 0.15, 8000, 6, 0, 1, 0, 2],
@@ -961,7 +1040,8 @@ NumberOfDependents""")
         label="📥  Download Sample CSV Template",
         data=sample_data.to_csv(index=False),
         file_name="sample_applicants.csv",
-        mime="text/csv"
+        mime="text/csv",
+        use_container_width=True
     )
 
 uploaded_file = st.file_uploader(
@@ -973,12 +1053,12 @@ uploaded_file = st.file_uploader(
 if uploaded_file is not None:
     try:
         batch_df = pd.read_csv(uploaded_file)
-        st.success(f"✅ Loaded {len(batch_df)} applicants from file")
+        st.success(f"✅ Loaded {len(batch_df)} applicant records from file")
 
         if 'MonthlyIncome' in batch_df.columns:
-            batch_df['MonthlyIncome'].fillna(batch_df['MonthlyIncome'].median(), inplace=True)
+            batch_df['MonthlyIncome'] = batch_df['MonthlyIncome'].fillna(batch_df['MonthlyIncome'].median())
         if 'NumberOfDependents' in batch_df.columns:
-            batch_df['NumberOfDependents'].fillna(0, inplace=True)
+            batch_df['NumberOfDependents'] = batch_df['NumberOfDependents'].fillna(0)
 
         if 'TotalLatePayments' not in batch_df.columns:
             batch_df['TotalLatePayments'] = (
@@ -1000,7 +1080,7 @@ if uploaded_file is not None:
             'TotalLatePayments', 'IncomePerDependent'
         ]
 
-        X_batch = batch_df[feature_cols].values
+        X_batch = batch_df[feature_cols]
         probs   = model.predict_proba(X_batch)[:, 1] * 100
 
         def batch_risk(p):
@@ -1068,7 +1148,7 @@ if uploaded_file is not None:
                 gridcolor='#1e2a3a'
             ),
             title=dict(
-                text='Risk Distribution of Uploaded Applicants',
+                text='Portfolio Risk Distribution',
                 font=dict(color='#94a3b8', size=13),
                 x=0.5
             )
@@ -1076,7 +1156,7 @@ if uploaded_file is not None:
         st.plotly_chart(fig_dist, use_container_width=True, config={'displayModeBar': False})
 
         st.download_button(
-            label="📥  Download All Results as CSV",
+            label="📥  Download Batch Results as CSV",
             data=results_df.to_csv(index=False),
             file_name="batch_risk_results.csv",
             mime="text/csv",
@@ -1095,7 +1175,7 @@ st.markdown("---")
 # FOOTER
 # ─────────────────────────────────────────────
 st.markdown("""
-<div style='text-align:center;color:#1e293b;font-size:0.75rem;padding:0.5rem'>
-    CreditIQ · Abhishek Kaware · VIT Pune · 2025
+<div style='text-align:center;color:#64748b;font-size:0.75rem;padding:0.5rem'>
+    CreditIQ · AI-Powered Credit Risk Intelligence · Abhishek Kaware
 </div>
 """, unsafe_allow_html=True)
