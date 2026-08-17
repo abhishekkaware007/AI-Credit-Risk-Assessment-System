@@ -32,6 +32,20 @@ This repository contains the `GiveMeSomeCredit` project: a credit risk assessmen
 
    python app.py
 
+## Deploy to Streamlit Cloud
+
+1. Push your repository to GitHub (branch `main`).
+2. Go to https://share.streamlit.io and sign in with GitHub.
+3. Click "New app", select the repository `abhishekkaware007/AI-Credit-Risk-Assessment-System`, branch `main`, and set the main file path to `GiveMeSomeCredit/app.py`.
+4. Ensure a `requirements.txt` file exists at `GiveMeSomeCredit/requirements.txt` (this repo includes one).
+5. If your models are large, either track them with Git LFS or host them externally and download at runtime (recommended). Streamlit Cloud may not fetch very large files directly from Git.
+6. Click "Deploy". Streamlit will install dependencies and launch the app.
+
+Troubleshooting:
+- If Streamlit fails to start, check the app logs on the Streamlit Cloud dashboard.
+- Ensure `streamlit` is listed in `requirements.txt` and the main file path is correct.
+
+
 ## Notes
 
 - Adjust dependency list above to match your environment or add a `requirements.txt` file.
