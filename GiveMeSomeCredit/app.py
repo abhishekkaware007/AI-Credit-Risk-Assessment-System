@@ -1155,6 +1155,141 @@ if uploaded_file is not None:
         )
         st.plotly_chart(fig_dist, use_container_width=True, config={'displayModeBar': False})
 
+        # ─────────────────────────────────────────────
+        # BATCH SHAP EXPLAINABILITY
+        # ─────────────────────────────────────────────
+        st.markdown('<div class="section-label" style="margin-top:1.5rem">Batch Explainable AI (XAI) & Applicant Drill-Down</div>', unsafe_allow_html=True)
+        
+        b_tab1, b_tab2 = st.tabs(["📊 Portfolio-Wide Risk Drivers", "🔍 Inspect Single Applicant from Batch"])
+        
+        with b_tab1:
+            try:
+                with st.spinner("Computing batch feature attribution..."):
+                    explainer = shap.TreeExplainer(model)
+                    eval_sample = X_batch if len(X_batch) <= 200 else X_batch.sample(200, random_state=42)
+                    b_shap_vals = explainer.shap_values(eval_sample)
+                    
+                    if isinstance(b_shap_vals, list):
+                        batch_sv = b_shap_vals[1] if len(b_shap_vals) > 1 else b_shap_vals[0]
+                    elif isinstance(b_shap_vals, np.ndarray) and b_shap_vals.ndim == 3 and b_shap_vals.shape[2] == 2:
+                        batch_sv = b_shap_vals[:, :, 1]
+                    elif isinstance(b_shap_vals, np.ndarray) and b_shap_vals.ndim == 2:
+                        batch_sv = b_shap_vals
+                    else:
+                        batch_sv = np.array(b_shap_vals)
+                        
+                    mean_impact = np.mean(np.abs(batch_sv), axis=0)
+                    sorted_order = np.argsort(mean_impact)
+                    sorted_features = [feature_cols[i] for i in sorted_order]
+                    sorted_values = [mean_impact[i] for i in sorted_order]
+                    
+                    fig_batch_shap = go.Figure(go.Bar(
+                        x=sorted_values,
+                        y=sorted_features,
+                        orientation='h',
+                        marker_color='#3b82f6',
+                        text=[f"{v:.3f}" for v in sorted_values],
+                        textposition='outside',
+                        textfont=dict(color='#94a3b8', size=11)
+                    ))
+                    fig_batch_shap.update_layout(
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        height=360,
+                        margin=dict(l=10, r=30, t=30, b=10),
+                        xaxis=dict(
+                            title="Mean |SHAP Value| (Average Impact Magnitude)",
+                            title_font=dict(color='#64748b', size=11),
+                            tickfont=dict(color='#94a3b8', size=11),
+                            gridcolor='#1e2a3a'
+                        ),
+                        yaxis=dict(
+                            tickfont=dict(color='#cbd5e1', size=11),
+                            gridcolor='rgba(0,0,0,0)'
+                        ),
+                        title=dict(
+                            text='Key Risk Drivers Across Entire Uploaded Batch',
+                            font=dict(color='#94a3b8', size=13),
+                            x=0.5
+                        )
+                    )
+                    st.plotly_chart(fig_batch_shap, use_container_width=True, config={'displayModeBar': False})
+            except Exception as e:
+                st.info(f"Portfolio SHAP summary: {e}")
+                
+        with b_tab2:
+            st.markdown(
+                '<div style="font-size:0.82rem;color:#64748b;margin-bottom:0.8rem">'
+                'Select any applicant from your uploaded file to generate their individual SHAP Waterfall explanation.'
+                '</div>',
+                unsafe_allow_html=True
+            )
+            
+            selected_idx = st.selectbox(
+                "Select Applicant to Inspect:",
+                options=list(range(len(batch_df))),
+                format_func=lambda i: f"Applicant #{i+1} — Income: {results_df.loc[i, 'Monthly Income']} | Risk: {results_df.loc[i, 'Default Probability']} | Decision: {results_df.loc[i, 'Decision']}"
+            )
+            
+            if selected_idx is not None:
+                try:
+                    with st.spinner(f"Computing explanation for Applicant #{selected_idx+1}..."):
+                        single_row = X_batch.iloc[[selected_idx]]
+                        explainer = shap.TreeExplainer(model)
+                        s_vals_ind = explainer.shap_values(single_row)
+                        
+                        if isinstance(s_vals_ind, list):
+                            s_ind = s_vals_ind[1][0] if len(s_vals_ind) > 1 else s_vals_ind[0][0]
+                            b_ind = explainer.expected_value[1] if isinstance(explainer.expected_value, (list, np.ndarray)) and len(explainer.expected_value) > 1 else (explainer.expected_value[0] if isinstance(explainer.expected_value, (list, np.ndarray)) else explainer.expected_value)
+                        elif isinstance(s_vals_ind, np.ndarray) and s_vals_ind.ndim == 3 and s_vals_ind.shape[2] == 2:
+                            s_ind = s_vals_ind[0, :, 1]
+                            if hasattr(explainer, 'expected_value') and isinstance(explainer.expected_value, (list, np.ndarray)) and len(explainer.expected_value) > 1:
+                                b_ind = explainer.expected_value[1]
+                            elif hasattr(explainer, 'expected_value'):
+                                b_ind = explainer.expected_value
+                            else:
+                                b_ind = 0.5
+                        elif isinstance(s_vals_ind, np.ndarray) and s_vals_ind.ndim == 2:
+                            s_ind = s_vals_ind[0]
+                            b_ind = explainer.expected_value[0] if isinstance(explainer.expected_value, (list, np.ndarray)) else (explainer.expected_value if hasattr(explainer, 'expected_value') else 0.5)
+                        else:
+                            s_ind = np.array(s_vals_ind).flatten()[:len(feature_cols)]
+                            b_ind = 0.5
+
+                        fig_ind, ax_ind = plt.subplots(figsize=(9, 5.5))
+                        fig_ind.patch.set_facecolor('#0d1117')
+                        ax_ind.set_facecolor('#0d1117')
+
+                        shap.waterfall_plot(
+                            shap.Explanation(
+                                values=s_ind,
+                                base_values=float(b_ind) if np.isscalar(b_ind) else float(b_ind[0]),
+                                data=single_row.iloc[0].values,
+                                feature_names=feature_cols
+                            ),
+                            show=False,
+                            max_display=12
+                        )
+
+                        ax_ind.tick_params(colors='#94a3b8', labelsize=10)
+                        for text in ax_ind.texts:
+                            text.set_color('#e2e8f0')
+                            text.set_fontsize(10)
+                        for spine in ax_ind.spines.values():
+                            spine.set_edgecolor('#1e2a3a')
+
+                        plt.rcParams['text.color']      = '#94a3b8'
+                        plt.rcParams['axes.labelcolor'] = '#94a3b8'
+                        plt.rcParams['xtick.color']     = '#64748b'
+                        plt.rcParams['ytick.color']     = '#94a3b8'
+                        plt.tight_layout(pad=2.0)
+                        st.pyplot(fig_ind, transparent=True)
+                        plt.clf()
+                        plt.close()
+                except Exception as e:
+                    st.info(f"Individual SHAP visualizer: {e}")
+
+        st.markdown("")
         st.download_button(
             label="📥  Download Batch Results as CSV",
             data=results_df.to_csv(index=False),
